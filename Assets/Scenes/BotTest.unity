@@ -141,7 +141,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   twitchAccountName: chopkneebot
-  ircChannelName: masjagbot
+  ircChannelName: sips_
   twitchOAuthKey: oauth:hxoeer4bz9bc8xtbn4sdfqwnvdhhzw
   twitchIRCURL: irc.twitch.tv
   twitchIRCPortNumber: 6667
