@@ -30,17 +30,23 @@ public class ChatBot : MonoBehaviour {
     [SerializeField]
     public List<Chatter> authorizedChatters;
 
-    public delegate void OnIRCConnected();
-    public OnIRCConnected IRCConnected;
+    public delegate void IRCConnected();
+    public IRCConnected ONIRCConnected;
 
-    public delegate void OnNewChatter(Chatter c);
-    public OnNewChatter NewChatter;
+    public delegate void NewChatter(Chatter c);
+    public NewChatter OnNewChatter;
 
-    public delegate void OnChatReceived(Chatter sender, string messageContent);
-    public OnChatReceived ChatReceived;
+    public delegate void ChatReceived(Chatter sender, string messageContent);
+    public ChatReceived OnChatReceived;
 
-    public delegate void OnMessageReceived(string message);
-    public OnMessageReceived MessageReceived;
+    public delegate void MessageReceived(string message);
+    public MessageReceived OnMessageReceived;
+
+    public delegate void CommandReceived(Chatter sender, string command, string[] args);
+    public CommandReceived OnCommandReceived;
+
+    public delegate void AuthorizedCommandReceived(Chatter sender, string command, string[] args);
+    public AuthorizedCommandReceived OnAuthorizedCommandReceived;
 
 	void Start () {
         ircChatters = new Dictionary<string, Chatter>();
@@ -70,17 +76,27 @@ public class ChatBot : MonoBehaviour {
                         Chatter newPerson = new Chatter(message);
                         Debug.Log("New person: " + newPerson);
                         ircChatters.Add(newPerson.userName, newPerson);
-                        if (NewChatter != null) {
-                            NewChatter(newPerson);
+                        if (OnNewChatter != null) {
+                            OnNewChatter(newPerson);
                         }
                     }
-                    if (ChatReceived != null) {
-                        ChatReceived(ircChatters[userName], message.Substring(message.IndexOf(" :") + 2));
+                    string chat = message.Substring(message.IndexOf(" :") + 2);
+                    if (chat.IndexOf('!') == 0) {
+                        //Command
+                        if (OnCommandReceived != null) {
+                            string[] command = chat.Split(' ');
+                            OnCommandReceived(ircChatters[userName], command[0], command);
+                        }
+                    } else {
+                        //Regular chat
+                        if (OnChatReceived != null) {
+                            OnChatReceived(ircChatters[userName], chat);
+                        }
                     }
                 } else {
                     //General messages from the server
-                    if (MessageReceived != null) {
-                        MessageReceived(message);
+                    if (OnMessageReceived != null) {
+                        OnMessageReceived(message);
                     }
                 }
                 
@@ -108,8 +124,8 @@ public class ChatBot : MonoBehaviour {
         _chatGetter = new ChatGetter(_irc, chatPollDelayMillis);
         Debug.Log("Starting chat polling thread....");
         _chatGetter.Start();
-        if (IRCConnected != null) {
-            IRCConnected();
+        if (ONIRCConnected != null) {
+            ONIRCConnected();
         }
     }
 
@@ -117,5 +133,14 @@ public class ChatBot : MonoBehaviour {
         _irc.PartChannel();
         _pingSender.Stop();
         _chatGetter.Stop();
+    }
+
+    public bool IsAuthorized(Chatter person) {
+        foreach (Chatter c in authorizedChatters) {
+            if (person.actualName == c.actualName) {
+                return true;
+            }
+        }
+        return false;
     }
 }

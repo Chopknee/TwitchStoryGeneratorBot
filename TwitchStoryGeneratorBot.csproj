@@ -288,7 +288,8 @@
     <Compile Include="Assets\Scripts\IRC\ChatGetter.cs" />
     <Compile Include="Assets\Scripts\IRC\IrcClient.cs" />
     <Compile Include="Assets\Scripts\IRC\PingSender.cs" />
-    <Compile Include="Assets\TEMPGUI.cs" />
+    <Compile Include="Assets\Scripts\StateController.cs" />
+    <Compile Include="Assets\Scripts\TEMPGUI.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <Target Name="GenerateTargetFrameworkMonikerAttribute" />

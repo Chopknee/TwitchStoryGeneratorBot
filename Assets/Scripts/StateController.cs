@@ -12,9 +12,11 @@ public class StateController : MonoBehaviour {
 
     enum BotState { IDLE, CHATSORM, ELIMINATION, END };
 
+    string[] commands = { "!chatstorm", "!vote" };
+
     ChatBot bot;
 
-    BotState currentState = BotState.IDLE;
+    BotState currentState = BotState.CHATSORM;
 
     //All times are in seconds
     
@@ -24,7 +26,7 @@ public class StateController : MonoBehaviour {
 
 
 	void Start () {
-		
+        bot.OnCommandReceived += OnCommandReceived;
 	}
 	
 	void Update () {
@@ -41,4 +43,37 @@ public class StateController : MonoBehaviour {
         }
 
 	}
+
+    /**
+     * Runs when a command has been received from a chatter in the IRC channel.
+     * 
+     */
+    public void OnCommandReceived(Chatter sender, string command, string[] args) {
+
+
+        switch (currentState) {
+            case BotState.IDLE:
+
+                break;
+            case BotState.CHATSORM:
+                if (command == commands[0]) {
+                    //Pitching an idea
+                    bot.SendPrivateMessage("@" + sender.userName + " your pitch has been added!");
+                } else {
+                    bot.SendPrivateMessage("@" + sender.userName + " invalid command");
+                }
+                break;
+            case BotState.ELIMINATION:
+                if (command == commands[1]) {
+                    //Voting for something
+                    bot.SendPrivateMessage("Thanks @" + sender.userName + " your voice has been heard!");
+                } else {
+                    bot.SendPrivateMessage("@" + sender.userName + " invalid command");
+                }
+                break;
+            case BotState.END:
+                
+                break;
+        }
+    }
 }

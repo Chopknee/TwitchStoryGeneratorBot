@@ -14,9 +14,9 @@ public class TEMPGUI : MonoBehaviour {
     public RectTransform chattersPanel;
 
     private void Start() {
-        chatbot.ChatReceived += OnChat;
-        chatbot.NewChatter += OnUserEntered;
-        chatbot.IRCConnected += OnConnect;
+        chatbot.OnChatReceived += OnChat;
+        chatbot.OnNewChatter += OnUserEntered;
+        chatbot.ONIRCConnected += OnConnect;
         getNamesButton.onClick.AddListener(OnGetNamesClicked);
 
     }
