@@ -69,7 +69,7 @@ public class ChatBot : MonoBehaviour {
                     if (!ircChatters.ContainsKey(userName)) {
                         Chatter newPerson = new Chatter(message);
                         Debug.Log("New person: " + newPerson);
-                        ircChatters.Add(newPerson.actualName, newPerson);
+                        ircChatters.Add(newPerson.userName, newPerson);
                         if (NewChatter != null) {
                             NewChatter(newPerson);
                         }
@@ -87,6 +87,10 @@ public class ChatBot : MonoBehaviour {
             }
         }
 	}
+
+    public void SendPrivateMessage(string message) {
+        _irc.SendPublicChatMessage(message);
+    }
 
     public void GetNames() {
         _irc.SendNamesCommand();
