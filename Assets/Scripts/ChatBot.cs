@@ -4,6 +4,13 @@ using UnityEngine;
 using TwitchIRCBot;
 using System;
 
+/**
+ * Class: ChatBot
+ * Purpose:
+ *  Used for communicating with the IRC services on twitch.
+ *  All settings should be exposed in the unity editor so modifying any values here is pointless.
+ * 
+ */
 public class ChatBot : MonoBehaviour {
 
     public string twitchAccountName = "";
@@ -48,6 +55,11 @@ public class ChatBot : MonoBehaviour {
     public delegate void AuthorizedCommandReceived(Chatter sender, string command, string[] args);
     public AuthorizedCommandReceived OnAuthorizedCommandReceived;
 
+    /**
+     * Function: Start()
+     * Purpose:
+     *  I would hope that is obvious.
+     */
 	void Start () {
         ircChatters = new Dictionary<string, Chatter>();
 
@@ -55,8 +67,20 @@ public class ChatBot : MonoBehaviour {
         if (runOnStartup) {
             StartBot();
         }
+
+        //Add all pre-defined authorized users to the chatters dictionary
+        foreach (Chatter person in authorizedChatters) {
+            ircChatters.Add(person.userName, person);
+        }
 	}
 	
+    /**
+     * Function: Update()
+     * Purpose:
+     * Runs once per frame. This specifically listens for messages grabbed by the irc thread.
+     * It then sorts out the messages between general irc messages, chat messages, and command messages.
+     * This also keeps track of chatters that have sent some form of communication.
+     */
 	void Update () {
         List<string> messages = _chatGetter.GetMessages();
         if (messages.Count > 0 && !_chatGetter.Flushing()) {
@@ -66,7 +90,6 @@ public class ChatBot : MonoBehaviour {
 
             //Do stuff with new ones
             foreach (string message in messages) {
-                Debug.Log(message);
                 //As new messages come in, add the newly discovered users
                 if (message.Contains("PRIVMSG")) {
                     //Look for the username in the message
@@ -81,20 +104,24 @@ public class ChatBot : MonoBehaviour {
                         }
                     }
                     string chat = message.Substring(message.IndexOf(" :") + 2);
+                    Debug.Log(chat.IndexOf('!'));
                     if (chat.IndexOf('!') == 0) {
                         //Command
+                        string[] command = chat.Split(' ');
+                        Debug.Log("Command message - " + userName + ":" + command[0]);
                         if (OnCommandReceived != null) {
-                            string[] command = chat.Split(' ');
                             OnCommandReceived(ircChatters[userName], command[0], command);
                         }
                     } else {
                         //Regular chat
+                        Debug.Log("Chat message - " + userName + ":" + chat);
                         if (OnChatReceived != null) {
                             OnChatReceived(ircChatters[userName], chat);
                         }
                     }
                 } else {
                     //General messages from the server
+                    Debug.Log(message);
                     if (OnMessageReceived != null) {
                         OnMessageReceived(message);
                     }
@@ -104,15 +131,30 @@ public class ChatBot : MonoBehaviour {
         }
 	}
 
+    /**
+     * Function: SendPrivateMessage(string message)
+     * Purpose:
+     *  Sends a chat message to the IRC.
+     */
     public void SendPrivateMessage(string message) {
         _irc.SendPublicChatMessage(message);
     }
 
+    /**
+     * Function: GetNames()
+     * Purpose:
+     *  Sends the NAMES IRC command. Does nothing on twitch.
+     */
     public void GetNames() {
         _irc.SendNamesCommand();
     }
 
-    //Creates the ping and chat getter threads.
+    /**
+     * Function: StartBot()
+     * Purpose:
+     *  Starts the threads neccessary to run the bot.
+     * 
+     */
     private void StartBot() {
         Debug.Log("Creating irc object....");
         _irc = new IRCClient(twitchIRCURL, twitchIRCPortNumber, twitchAccountName, twitchOAuthKey, ircChannelName);
@@ -129,12 +171,24 @@ public class ChatBot : MonoBehaviour {
         }
     }
 
+    /**
+     * Function: OnDestroy()
+     * Purpose:
+     *  Kills the threads running the IRC and PING functions.
+     * 
+     * 
+     */
     public void OnDestroy() {
         _irc.PartChannel();
         _pingSender.Stop();
         _chatGetter.Stop();
     }
 
+    /**
+     * Function: IsAuthorized()
+     * Purpose:
+     *  Actually useless.
+     */
     public bool IsAuthorized(Chatter person) {
         foreach (Chatter c in authorizedChatters) {
             if (person.actualName == c.actualName) {

@@ -285,6 +285,7 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Assets\GeneratorUI.cs" />
     <Compile Include="Assets\Scripts\ChatBot.cs" />
     <Compile Include="Assets\Scripts\Chatter.cs" />
     <Compile Include="Assets\Scripts\IRC\ChatGetter.cs" />
