@@ -22,10 +22,10 @@ public class StateController : MonoBehaviour {
     public float eliminationRoundTime = 120;
     public float stageTimeRemaining = 0;
     public string currentTheme = "";
-    public float startTime = 0;
-    public int eliminationRoundNumber = 0;
-    public int eliminationRoundState = 0;
-    public int eliminationRoundMax = 0;
+    public float startTime = 0;//
+    public int eliminationRoundNumber = 0; //The vertical position in the elimination bracket
+    public int eliminationRoundState = 0;// Controls what is happening during the elimination bracket phase
+    public int eliminationRoundMax = 0;//The number of vertical positions in the elimination bracket
 
     //public Dictionary<Chatter, List<string>> ideas;
     public List<Idea> ideasList;
@@ -99,6 +99,7 @@ public class StateController : MonoBehaviour {
                         bot.SendPrivateMessage("Setting up bracket layer.");
                         //Initial beginning for calculating the constraints of the elimination round
                         eliminationRoundMax = Mathf.CeilToInt(ideasList.Count / 2.0f);
+                        eliminationRoundNumber = 0;
                         eliminationRoundState++;
                         break;
                     case 1:
@@ -128,53 +129,60 @@ public class StateController : MonoBehaviour {
                         break;
                     case 3:
                         stageTimeRemaining = (Time.fixedTime - startTime);
+
+                        //There is a chance that there are an odd number of items in the list
+                        //If this is the case one of the items will automatically move to the next round
+                        //Checking for that instance here
+                        if (eliminationRoundNumber * 2 + 1 >= ideasList.Count) {
+                            //End the voting round
+                            int ideaIndex = eliminationRoundNumber * 2;
+                            bot.SendPrivateMessage(ideasList[ideaIndex].idea + " wins by default because an odd number of ideas were in this layer of the bracket.");
+                            eliminationRoundState++;
+                            //Show the transition
+                            if (OnShowWinningVote != null) {
+                                transitioning = true;
+                                OnShowWinningVote(ideasList[ideaIndex].idea);
+                            }
+                        }
+
                         // Giving chat a chance to vote on the winning item here
                         // This is waiting to trigger the end of voting state
                         // and will show the winner and wait for a bit.
                         if (stageTimeRemaining >= eliminationRoundTime) {
-                            int ones = 0;
-                            int twos = 0;
-                            //Tally the votes
-                            foreach (KeyValuePair<Chatter, int> vote in votes) {
-                                if (vote.Value == 1) {
-                                    ones++;
-                                } else if (vote.Value == 2) {
-                                    twos++;
-                                }
-                            }
 
-                            eliminationRoundState++;
-                            eliminationRoundNumber++;
-
+                            int[] voteTally = CountVotes();
                             int winningIndex = -1;
                             int loosingIndex = -1;
 
-                            if (ones > twos) {
+                            if (voteTally[0] > voteTally[1]) {
                                 winningIndex = eliminationRoundNumber * 2;
                                 loosingIndex = eliminationRoundNumber * 2 + 1;
 
-                            } else if (twos > ones) {
+                            } else if (voteTally[1] > voteTally[0]) {
                                 winningIndex = eliminationRoundNumber * 2 + 1;
                                 loosingIndex = eliminationRoundNumber * 2;
                             }
+
+                            eliminationRoundState++;
                             if (winningIndex != -1) {
-                                deletedIdeas.Add(ideasList[loosingIndex]);
-                                Debug.Log("IM ACTUALLY RUNNING THIS, TWITCH IS BEING A TWAT. (A VOTE WON)");
+                                //A winner has been chosen, display it, then move to the next stage
+                                deletedIdeas.Add(ideasList[loosingIndex]);//Mark the loosing idea for deletion
                                 bot.SendPrivateMessage("Voting has ended, the idea " + ideasList[winningIndex].idea + " pitched by " + ideasList[winningIndex].sender.userName + " has won the vote and moved on.");
-                                //Need to delete the vote from the dictionary now...
                                 if (OnShowWinningVote != null) {
                                     transitioning = true;
                                     OnShowWinningVote(ideasList[winningIndex].idea);//This needs to be the winning vote.
                                 }
                             } else {
                                 //Tiebreaker.
-                                Debug.Log("IM ACTUALLY RUNNING THIS, TWITCH IS BEING A TWAT. (THERE WAS A TIE)");
                                 bot.SendPrivateMessage("THERE WAS A TIE, CANNOT DEAL WITH SITUATION. SHUTTING DOWN....");
                                 currentState = BotState.END;
                             }
+                            //Increment the state
                         }
                         break;
                     case 4:
+                        //Once this state has been reached, increment the round number (this is the vertical position in the bracket)
+                        eliminationRoundNumber++;
                         if (eliminationRoundNumber >= eliminationRoundMax) {
                             // This layer of the elimination round is done with.
                             foreach (Idea idea in deletedIdeas) {
@@ -196,7 +204,7 @@ public class StateController : MonoBehaviour {
                         //An idea was singled out, show it then end this!
                         currentState = BotState.END;
                         eliminationRoundState = 0;
-
+                        bot.SendPrivateMessage("The idea " + ideasList[0].idea + " pitched by " + ideasList[0].sender.userName + " has made it through the bracket, horay!");
                         if (OnIdeaChosen != null) {
                             transitioning = true;
                             OnIdeaChosen(ideasList[0].sender, ideasList[0].idea);
@@ -399,4 +407,23 @@ public class StateController : MonoBehaviour {
             this.idea = idea;
         }
     }
+
+    public int[] CountVotes() {
+        //Tally the votes
+        int[] voteCounts = new int[2];
+        foreach (KeyValuePair<Chatter, int> vote in votes) {
+            if (vote.Value == 1) {
+                voteCounts[0]++;
+            } else if (vote.Value == 2) {
+                voteCounts[1]++;
+            }
+        }
+        return voteCounts;
+    }
+
 }
+
+/**
+ * Congratulations on making it to the bottom of this spagetti code monstrosity of a C# script.
+ * I wrote this in a day give me a break.
+ */
