@@ -12,26 +12,24 @@ public class StateController : MonoBehaviour {
 
     public enum BotState { IDLE, CHATSORM, ELIMINATION, END };
 
-    string[] commands = { "!chatstorm", "!vote", "!settheme", "!begin" };
-
+    string[] commands = { "!pitch", "!vote", "!settheme", "!begin" };
 
     public ChatBot bot;
     public BotState currentState = BotState.IDLE;
-
     //All times are in seconds
-    
     public float chatstormTime = 300;
     public float ideasLimit = 100;
     public float eliminationRoundTime = 120;
-
+    public float stageTimeRemaining = 0;
     public string currentTheme = "";
-
     public float startTime = 0;
+    public int eliminationRoundNumber = 0;
+    public int eliminationRoundState = 0;
+    public int eliminationRoundMax = 0;
 
-    public Dictionary<Chatter, List<string>> ideas;
-    public int ideasCount = 0;
+    //public Dictionary<Chatter, List<string>> ideas;
     public List<Idea> ideasList;
-    public List<int> deletedIdeas;
+    public List<Idea> deletedIdeas;
 
     public Dictionary<Chatter, int> votes;
 
@@ -47,7 +45,7 @@ public class StateController : MonoBehaviour {
     public delegate void IdeasPhaseOver();
     public IdeasPhaseOver OnIdeasPhaseOver;
 
-    public delegate void ShowBracket(Dictionary<Chatter, List<string>> remainingIdeas);
+    public delegate void ShowBracket(List<Idea> remainingIdeas);
     public ShowBracket OnShowBracket;
 
     public delegate void ShowVoteItems(string itemA, string itemB);
@@ -59,12 +57,18 @@ public class StateController : MonoBehaviour {
     public delegate void VoteAdded(Chatter sender, int option);
     public VoteAdded OnVoteAdded;
 
+    public delegate void IdeaChosen(Chatter sender, string idea);
+    public IdeaChosen OnIdeaChosen;
+
     bool transitioning = false;
 
 	void Start () {
         bot.OnCommandReceived += OnCommandReceived;
 
-        ideas = new Dictionary<Chatter, List<string>>();
+        //ideas = new Dictionary<Chatter, List<string>>();
+        ideasList = new List<Idea>();
+        votes = new Dictionary<Chatter, int>();
+        deletedIdeas = new List<Idea>();
 
 	}
 	
@@ -77,8 +81,9 @@ public class StateController : MonoBehaviour {
                 //Nothing needs to happen here.
                 break;
             case BotState.CHATSORM:
+                stageTimeRemaining = (Time.fixedTime - startTime);
                 //This is triggering the end of the chatstorming phase
-                if (ideasCount >= ideasLimit || (Time.fixedTime - startTime) >= chatstormTime) {
+                if (ideasList.Count > 0 && (ideasList.Count >= ideasLimit || stageTimeRemaining >= chatstormTime)) {
                     //Trigger the end of the ideas phase.
                     bot.SendPrivateMessage("Idea pitching phase is over!");
                     currentState = BotState.ELIMINATION;
@@ -91,8 +96,9 @@ public class StateController : MonoBehaviour {
             case BotState.ELIMINATION:
                 switch (eliminationRoundState) {
                     case 0:
+                        bot.SendPrivateMessage("Setting up bracket layer.");
                         //Initial beginning for calculating the constraints of the elimination round
-                        eliminationRoundMax = Mathf.CeilToInt(ideasCount / 2.0f);
+                        eliminationRoundMax = Mathf.CeilToInt(ideasList.Count / 2.0f);
                         eliminationRoundState++;
                         break;
                     case 1:
@@ -100,7 +106,7 @@ public class StateController : MonoBehaviour {
                         //Spend a moment to show the remaining bracket
                         if (OnShowBracket != null) {
                             transitioning = true;
-                            OnShowBracket(ideas);
+                            OnShowBracket(ideasList);
                         }
                         break;
                     case 2:
@@ -111,23 +117,21 @@ public class StateController : MonoBehaviour {
                         if (eliminationRoundNumber * 2 + 1 < ideasList.Count) {
                             itemB = ideasList[eliminationRoundNumber * 2 + 1].idea;
                         }
-                        
-
+                        bot.SendPrivateMessage("Voting for " + itemA + " or " + itemB);
                         startTime = Time.fixedTime;
 
+                        eliminationRoundState++;
                         if (OnShowVoteItems != null) {
                             transitioning = true;
                             OnShowVoteItems(itemA, itemB);
                         }
                         break;
                     case 3:
+                        stageTimeRemaining = (Time.fixedTime - startTime);
                         // Giving chat a chance to vote on the winning item here
                         // This is waiting to trigger the end of voting state
                         // and will show the winner and wait for a bit.
-                        if (Time.fixedTime - startTime >= eliminationRoundTime) {
-                            bot.SendPrivateMessage("Voting has ended!");
-                            eliminationRoundState++;
-                            eliminationRoundNumber++;
+                        if (stageTimeRemaining >= eliminationRoundTime) {
                             int ones = 0;
                             int twos = 0;
                             //Tally the votes
@@ -138,35 +142,64 @@ public class StateController : MonoBehaviour {
                                     twos++;
                                 }
                             }
-                            string winner = "";
+
+                            eliminationRoundState++;
+                            eliminationRoundNumber++;
+
+                            int winningIndex = -1;
+                            int loosingIndex = -1;
+
                             if (ones > twos) {
-                                winner = ideasList[eliminationRoundNumber * 2].idea;
-                                deletedIdeas.Add(eliminationRoundNumber * 2 + 1);
+                                winningIndex = eliminationRoundNumber * 2;
+                                loosingIndex = eliminationRoundNumber * 2 + 1;
 
                             } else if (twos > ones) {
-                                winner = ideasList[eliminationRoundNumber * 2+1].idea;
-                                deletedIdeas.Add(eliminationRoundNumber * 2);
-                            } else {
-                                //Tie!!!!
-                                winner = "Tie";
+                                winningIndex = eliminationRoundNumber * 2 + 1;
+                                loosingIndex = eliminationRoundNumber * 2;
                             }
-
-                            //Need to delete the vote from the dictionary now...
-                            if (OnShowWinningVote != null) {
-                                transitioning = true;
-                                OnShowWinningVote(winner);//This needs to be the winning vote.
+                            if (winningIndex != -1) {
+                                deletedIdeas.Add(ideasList[loosingIndex]);
+                                Debug.Log("IM ACTUALLY RUNNING THIS, TWITCH IS BEING A TWAT. (A VOTE WON)");
+                                bot.SendPrivateMessage("Voting has ended, the idea " + ideasList[winningIndex].idea + " pitched by " + ideasList[winningIndex].sender.userName + " has won the vote and moved on.");
+                                //Need to delete the vote from the dictionary now...
+                                if (OnShowWinningVote != null) {
+                                    transitioning = true;
+                                    OnShowWinningVote(ideasList[winningIndex].idea);//This needs to be the winning vote.
+                                }
+                            } else {
+                                //Tiebreaker.
+                                Debug.Log("IM ACTUALLY RUNNING THIS, TWITCH IS BEING A TWAT. (THERE WAS A TIE)");
+                                bot.SendPrivateMessage("THERE WAS A TIE, CANNOT DEAL WITH SITUATION. SHUTTING DOWN....");
+                                currentState = BotState.END;
                             }
                         }
                         break;
                     case 4:
                         if (eliminationRoundNumber >= eliminationRoundMax) {
                             // This layer of the elimination round is done with.
-                            foreach (int indexToDelete in deletedIdeas) {
-                                ideas[ideasList[indexToDelete].sender]
+                            foreach (Idea idea in deletedIdeas) {
+                                ideasList.Remove(idea);
+                            }
+                            deletedIdeas.Clear();
+
+                            if (ideasList.Count > 1) {
+                                eliminationRoundState = 0;
+                            } else {
+                                eliminationRoundState = 5;
                             }
                         } else {
                             // We are not done with the layer, go back to state 1
                             eliminationRoundState = 1;
+                        }
+                        break;
+                    case 5:
+                        //An idea was singled out, show it then end this!
+                        currentState = BotState.END;
+                        eliminationRoundState = 0;
+
+                        if (OnIdeaChosen != null) {
+                            transitioning = true;
+                            OnIdeaChosen(ideasList[0].sender, ideasList[0].idea);
                         }
                         break;
                 }
@@ -191,28 +224,17 @@ public class StateController : MonoBehaviour {
             case BotState.IDLE:
                 OnCommandReceivedIdle(sender, command, args);
                 break;
-
             case BotState.CHATSORM:
                 OnCommandReceivedChatstorm(sender, command, args);
                 break;
             case BotState.ELIMINATION:
-                if (command == commands[1]) {
-                    //Voting for something
-                    bot.SendPrivateMessage("Thanks @" + sender.userName + " your voice has been heard!");
-                } else {
-                    bot.SendPrivateMessage("@" + sender.userName + " invalid command");
-                }
+                OnCommandReceivedElimination(sender, command, args);
                 break;
             case BotState.END:
                 
                 break;
         }
     }
-
-    public int eliminationRoundNumber = 0;
-
-    public int eliminationRoundState = 0;
-    public int eliminationRoundMax = 0;
 
     /**
      * Function: OnCommandReceivedElimination(Chatter sender, string command, string[] args)
@@ -222,12 +244,13 @@ public class StateController : MonoBehaviour {
     public void OnCommandReceivedElimination(Chatter sender, string command, string[] args) {
         //There are several sub-stages to this part.
 
-        //This needs to be done for each layer of the bracket.
-        //1 - Show all remaining submissions for this part
-        //2 - Select 2 submissions (in order of the list) to be voted against one-another
-        //3 - Vote for the winner
-        //4 - Show the winner
-        //5 - Repeat
+        //0 - Set up the current bracket layer
+            //1 - Show all remaining submissions for this part
+            //2 - Select 2 submissions (in order of the list) to be voted against one-another
+            //3 - Vote for the winner
+            //4 - Show the winner
+            //5 - If no items left in current bracket layer go to 6 else goto 1
+        //6 if one item left in list go to 7 else go to 0
         //Repeat until only 1 submission remains. All others are erased from existance.
 
         //Simulating an elimination bracket....
@@ -291,14 +314,9 @@ public class StateController : MonoBehaviour {
                         idea += " ";
                     }
                 }
-                if (!ideas.ContainsKey(sender)) {
-                    ideas.Add(sender, new List<string>());
-                }
-                ideas[sender].Add(idea);
                 ideasList.Add(new Idea(sender, idea));
-                bot.SendPrivateMessage("@" + sender.userName + " your pitch of " + idea + " has been added!");
+                bot.SendPrivateMessage("@" + sender.userName + " your pitch of <i>\"" + idea + "\"</i> has been added!");
                 OnIdeaPitched(sender, idea);
-                ideasCount++;
             } else {
                 bot.SendPrivateMessage("@" + sender.userName + " I could not add your idea. There was no content after the command.");
             }

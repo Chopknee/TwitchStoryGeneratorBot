@@ -143,11 +143,14 @@ MonoBehaviour:
   bot: {fileID: 1308615647}
   currentState: 0
   chatstormTime: 300
-  ideasLimit: 100
-  eliminationRoundTime: 120
+  ideasLimit: 2
+  eliminationRoundTime: 30
+  stageTimeRemaining: 0
   currentTheme: 
   startTime: 0
-  ideasCount: 0
+  eliminationRoundNumber: 0
+  eliminationRoundState: 0
+  eliminationRoundMax: 0
 --- !u!4 &9365901
 Transform:
   m_ObjectHideFlags: 0
