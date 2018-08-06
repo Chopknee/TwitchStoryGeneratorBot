@@ -57,10 +57,16 @@ public class StateController : MonoBehaviour {
     public delegate void VoteAdded(Chatter sender, int option);
     public VoteAdded OnVoteAdded;
 
+    public delegate void VoteRemoved(Chatter sender, int option);
+    public VoteRemoved OnVoteRemoved;
+
     public delegate void IdeaChosen(Chatter sender, string idea);
     public IdeaChosen OnIdeaChosen;
 
     bool transitioning = false;
+
+    public bool nonOppedCommandFeedback = true;//Enable/Disable non op command feedback messages
+    public bool oppedCommandFeedback = true;//Enable/Disable op command feedback messages
 
 	void Start () {
         bot.OnCommandReceived += OnCommandReceived;
@@ -79,6 +85,7 @@ public class StateController : MonoBehaviour {
         switch (currentState) {
             case BotState.IDLE:
                 //Nothing needs to happen here.
+                ideasList.Clear();//Remove old ideas
                 break;
             case BotState.CHATSORM:
                 stageTimeRemaining = (Time.fixedTime - startTime);
@@ -118,6 +125,7 @@ public class StateController : MonoBehaviour {
                         if (eliminationRoundNumber * 2 + 1 < ideasList.Count) {
                             itemB = ideasList[eliminationRoundNumber * 2 + 1].idea;
                         }
+                        votes.Clear();//Make sure old votes are cleared out.
                         bot.SendPrivateMessage("Voting for " + itemA + " or " + itemB);
                         startTime = Time.fixedTime;
 
@@ -174,10 +182,30 @@ public class StateController : MonoBehaviour {
                                 }
                             } else {
                                 //Tiebreaker.
-                                bot.SendPrivateMessage("THERE WAS A TIE, CANNOT DEAL WITH SITUATION. SHUTTING DOWN....");
-                                currentState = BotState.END;
+                                bot.SendPrivateMessage("Tie, selecting option at random...");
+                                int opt = Mathf.RoundToInt(Random.value) + 1;//Returns a number that is either 1 or 2.
+
+                                if (opt == 1) {
+                                    winningIndex = eliminationRoundNumber * 2;
+                                    loosingIndex = eliminationRoundNumber * 2 + 1;
+
+                                } else {
+                                    winningIndex = eliminationRoundNumber * 2 + 1;
+                                    loosingIndex = eliminationRoundNumber * 2;
+                                }
+
+                                eliminationRoundState++;
+                                if (winningIndex != -1) {
+                                    //A winner has been chosen, display it, then move to the next stage
+                                    deletedIdeas.Add(ideasList[loosingIndex]);//Mark the loosing idea for deletion
+                                    bot.SendPrivateMessage("The idea " + ideasList[winningIndex].idea + " pitched by " + ideasList[winningIndex].sender.userName + " has been selected at rtandom.");
+                                    if (OnShowWinningVote != null) {
+                                        transitioning = true;
+                                        OnShowWinningVote(ideasList[winningIndex].idea);//This needs to be the winning vote.
+                                    }
+                                }
+                                //Increment the state
                             }
-                            //Increment the state
                         }
                         break;
                     case 4:
@@ -276,26 +304,39 @@ public class StateController : MonoBehaviour {
                 if (command == "!vote") {
                     if (!votes.ContainsKey(sender)) {
                         votes.Add(sender, -1);
+                    } else {
+                        //If the person has already voted
+                        if (votes[sender] != -1) {
+                            OnVoteRemoved(sender, votes[sender]);
+                        }
                     }
                     if (args[1].ToLower() == "one" || args[1] == "1") {
                         //Voted a
                         votes[sender] = 1;
-                        bot.SendPrivateMessage("@" + sender.userName + " has voted for option 1");
+                        if (nonOppedCommandFeedback) {
+                            bot.SendPrivateMessage("@" + sender.userName + " has voted for option 1");
+                        }
                     } else if (args[1].ToLower() == "two" || args[1] == "2") {
                         //Voted b
                         votes[sender] = 2;
-                        bot.SendPrivateMessage("@" + sender.userName + " has voted for option 2");
+                        if (nonOppedCommandFeedback) {
+                            bot.SendPrivateMessage("@" + sender.userName + " has voted for option 2");
+                        }
                     } else {
                         //Invalid vote, do not set it? ( by default the vote is invalid )
                         //votes[sender] = -1;
-                        bot.SendPrivateMessage("@" + sender.userName + " invalid vote argument either ( 1, 2, one, or two).");
+                        if (nonOppedCommandFeedback) {
+                            bot.SendPrivateMessage("@" + sender.userName + " invalid vote argument either ( 1, 2, one, or two).");
+                        }
                     }
                     //Report to the gui that a vote was added.
                     if (OnVoteAdded != null) {
                         OnVoteAdded(sender, votes[sender]);
                     }
                 } else {
-                    bot.SendPrivateMessage("@" + sender.userName + " invalid command.");
+                    if (nonOppedCommandFeedback) {
+                        bot.SendPrivateMessage("@" + sender.userName + " invalid command.");
+                    }
                 }
                 break;
         }
@@ -323,15 +364,21 @@ public class StateController : MonoBehaviour {
                     }
                 }
                 ideasList.Add(new Idea(sender, idea));
-                bot.SendPrivateMessage("@" + sender.userName + " your pitch of <i>\"" + idea + "\"</i> has been added!");
+                if (nonOppedCommandFeedback) {
+                    bot.SendPrivateMessage("@" + sender.userName + " your pitch of <i>\"" + idea + "\"</i> has been added!");
+                }
                 OnIdeaPitched(sender, idea);
             } else {
-                bot.SendPrivateMessage("@" + sender.userName + " I could not add your idea. There was no content after the command.");
+                if (nonOppedCommandFeedback) {
+                    bot.SendPrivateMessage("@" + sender.userName + " I could not add your idea. There was no content after the command.");
+                }
             }
 
             
         } else {
-            bot.SendPrivateMessage("@" + sender.userName + " invalid command");
+            if (nonOppedCommandFeedback) {
+                bot.SendPrivateMessage("@" + sender.userName + " invalid command");
+            }
         }
     }
 
@@ -359,9 +406,13 @@ public class StateController : MonoBehaviour {
                         }
                     }
                     OnThemeSet(currentTheme);
-                    bot.SendPrivateMessage("The theme has been set to " + currentTheme);
+                    if (oppedCommandFeedback) {
+                        bot.SendPrivateMessage("The theme has been set to " + currentTheme);
+                    }
                 } else {
-                    bot.SendPrivateMessage("@" + sender.userName + " could not add theme, there was nothing after the command.");
+                    if (oppedCommandFeedback) {
+                        bot.SendPrivateMessage("@" + sender.userName + " could not add theme, there was nothing after the command.");
+                    }
                 }
             } else if (command == commands[3]) {
                 //Start the next phase up.
@@ -375,14 +426,20 @@ public class StateController : MonoBehaviour {
                     }
                 } else {
                     //Can't start no theme is set.
-                    bot.SendPrivateMessage("@" + sender.userName + " unable to start, there is no set theme.");
+                    if (oppedCommandFeedback) {
+                        bot.SendPrivateMessage("@" + sender.userName + " unable to start, there is no set theme.");
+                    }
                 }
             } else {
                 //Unknown command.
-                bot.SendPrivateMessage("@" + sender.userName + " unknown command " + command + ".");
+                if (oppedCommandFeedback) {
+                    bot.SendPrivateMessage("@" + sender.userName + " unknown command " + command + ".");
+                }
             }
         } else {
-            bot.SendPrivateMessage("@" + sender.userName + " you are not authorized to run commands.");
+            if (nonOppedCommandFeedback) {
+                bot.SendPrivateMessage("@" + sender.userName + " you are not authorized to run commands.");
+            }
         }
     }
 

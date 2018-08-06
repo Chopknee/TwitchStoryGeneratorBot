@@ -286,6 +286,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Assets\GeneratorUI.cs" />
+    <Compile Include="Assets\PitchingPanel.cs" />
     <Compile Include="Assets\Scripts\ChatBot.cs" />
     <Compile Include="Assets\Scripts\Chatter.cs" />
     <Compile Include="Assets\Scripts\IRC\ChatGetter.cs" />
@@ -293,6 +294,8 @@
     <Compile Include="Assets\Scripts\IRC\PingSender.cs" />
     <Compile Include="Assets\Scripts\StateController.cs" />
     <Compile Include="Assets\Scripts\TEMPGUI.cs" />
+    <Compile Include="Assets\SelfDestruction.cs" />
+    <Compile Include="Assets\VotingPanel.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <Target Name="GenerateTargetFrameworkMonikerAttribute" />
